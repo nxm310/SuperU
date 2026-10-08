@@ -20,17 +20,10 @@ from .gmail_sync import (
 
 app = FastAPI(title="Super U Ticket Manager", version="1.0.0")
 
-# Restrict CORS to local loopback only
-ALLOWED_ORIGINS = [
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173"
-]
-
+# Allow local machine, local network LAN, and OrbStack domains
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|.*\.local|.*\.orb\.local|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
