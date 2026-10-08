@@ -14,17 +14,20 @@ CATEGORIES_KEYWORDS = {
         "champignon", "concombr", "poivron", "haricot vert", "brocoli", "chou", "epinard", "radis",
         "aubergin", "persil", "basilic", "menthe", "herbe", "ananas", "mangue"
     ],
-    "Boucherie & Poissonnerie": [
+    "Boucherie & Charcuterie": [
         "boeuf", "porc", "veau", "agneau", "steak", "hach", "roti", "poulet", "dind", "canard",
         "lardon", "jambon", "sauciss", "saucisson", "merguez", "chipolat", "filet mignon", "nugget",
+        "boudin", "cotes", "escalop", "viande", "boucherie", "charct", "charcuterie", "salami"
+    ],
+    "Poissonnerie": [
         "saumon", "thon", "cabillaud", "colin", "crevett", "truit", "merlu", "moule", "poisson",
-        "surimi", "boudin", "cotes", "escalop", "viande", "boucherie"
+        "surimi"
     ],
     "Frais & Produits Laitiers": [
         "lait", "beurr", "crem", "yaourt", "fromag", "emmental", "comt", "camembert", "brie",
         "mozzarella", "chevr", "raclett", "gouda", "cantal", "roquefort", "parmesan", "gruyer",
         "reblochon", "skyr", "faissell", "petit suiss", "oeuf", "creme fraich", "dessert lact",
-        "maroilles", "bleu", "mascarpon", "ricotta", "cremerie"
+        "maroilles", "bleu", "mascarpon", "ricotta", "cremerie", "ultra frais", "yrt"
     ],
     "Boulangerie & Pâtisserie": [
         "baguett", "pain", "brioch", "croissant", "chocolatin", "pain choc", "viennoiseri",
@@ -36,17 +39,21 @@ CATEGORIES_KEYWORDS = {
         "lentill", "pois chich", "haricot blanc", "conserv", "thon boit", "sardin", "mais",
         "sauc tomat", "coulis", "pesto", "huil", "vinaigr", "moutard", "mayonnais", "ketchup",
         "sel", "poivr", "epic", "chips", "aperitif", "cacahuet", "pistach", "noix", "soup",
-        "bouillon", "farin", "chapelur", "thon natur", "bolognais"
+        "bouillon", "farin", "chapelur", "thon natur", "bolognais", "traiteur", "fusilli"
     ],
     "Épicerie Sucrée": [
         "chocolat", "choc", "biscuit", "cooki", "gateau", "petit beurr", "confitur", "nutella",
         "pat a tartin", "miel", "sucr", "cereal", "muesli", "flocon", "caf", "the ", "infusion",
-        "cacao", "compot", "bonbon", "haribo", "speculoos"
+        "cacao", "compot", "bonbon", "haribo", "speculoos", "confiserie", "lutti", "acidulees"
     ],
     "Boissons": [
         "eau ", "cristallin", "evian", "volvic", "hepar", "perrier", "badoit", "pellegrino",
         "jus", "soda", "cola", "pepsi", "schweppes", "fanta", "sprite", "ice tea", "oasis",
-        "sirop", "bier", "cidre", "vin ", "bordeaux", "champagn", "limonad", "boisson"
+        "sirop", "bier", "cidre", "vin ", "bordeaux", "champagn", "limonad", "boisson",
+        "fuzetea", "suze", "whiskey", "alcool", "aperitif"
+    ],
+    "Animalerie": [
+        "chien", "chat", "pedigree", "croquett", "patee", "litiere", "animal"
     ],
     "Surgelés": [
         "surgele", "glace", "sorbet", "frit", "pizza surgele", "legum surgele", "poelee"
@@ -63,16 +70,14 @@ CATEGORIES_KEYWORDS = {
 
 def clean_product_name(raw: str) -> str:
     """Cleans raw receipt line item name into readable title case."""
-    # Remove leading/trailing markers and codes
     s = re.sub(r'^[0-9\*\#\-\.]+\s*', '', raw)
-    s = re.sub(r'\s+[0-9]{1,2}$', '', s)  # trailing tax code like ' 1' or ' 2'
+    s = re.sub(r'\s+[0-9]{1,2}$', '', s)  # trailing tax code like ' 11' or ' 13'
     s = re.sub(r'\s{2,}', ' ', s).strip()
     
-    # Capitalize cleanly
     words = s.split()
     cleaned_words = []
     for w in words:
-        if w.upper() in ["U", "BIO", "AOP", "IGP", "TVA", "TTC", "KG", "G", "ML", "CL", "L"]:
+        if w.upper() in ["U", "BIO", "AOP", "IGP", "TVA", "TTC", "KG", "G", "ML", "CL", "L", "BF", "PLT"]:
             cleaned_words.append(w.upper())
         elif re.match(r'^\d+[GgKkLlLmM]+$', w):
             cleaned_words.append(w.upper())
@@ -81,8 +86,29 @@ def clean_product_name(raw: str) -> str:
     
     return " ".join(cleaned_words) if cleaned_words else raw.strip().title()
 
-def categorize_item(name: str) -> str:
-    """Determines item category based on product title."""
+def categorize_item(name: str, section_category: str = "") -> str:
+    """Determines item category based on section header or keywords."""
+    if section_category and section_category not in ["Autre", "Divers", ""]:
+        sec_lower = section_category.lower()
+        if any(w in sec_lower for w in ["chien", "chat", "animal"]):
+            return "Animalerie"
+        if any(w in sec_lower for w in ["fromage", "lait", "cremerie", "ultra frais", "creme"]):
+            return "Frais & Produits Laitiers"
+        if any(w in sec_lower for w in ["boucherie", "charcuterie", "charct", "viande"]):
+            return "Boucherie & Charcuterie"
+        if any(w in sec_lower for w in ["poisson", "mer"]):
+            return "Poissonnerie"
+        if any(w in sec_lower for w in ["alcool", "aperitif", "boisson", "vins"]):
+            return "Boissons"
+        if any(w in sec_lower for w in ["biscuit", "confiserie", "confiture", "sucre", "chocolat"]):
+            return "Épicerie Sucrée"
+        if any(w in sec_lower for w in ["traiteur", "sale", "salee", "conserve", "pate"]):
+            return "Épicerie Salée"
+        if any(w in sec_lower for w in ["boulangerie", "pain", "viennoiserie"]):
+            return "Boulangerie & Pâtisserie"
+        if any(w in sec_lower for w in ["fruit", "legume"]):
+            return "Fruits & Légumes"
+
     name_lower = name.lower()
     for cat, keywords in CATEGORIES_KEYWORDS.items():
         for kw in keywords:
@@ -101,14 +127,14 @@ def parse_price(val_str: str) -> Optional[float]:
         return None
 
 def parse_date(date_str: str) -> Optional[str]:
-    """Parse various French date string formats into standard YYYY-MM-DD HH:MM:SS."""
+    """Parse French date string into standard YYYY-MM-DD HH:MM:SS."""
     if not date_str:
         return None
     date_str = date_str.strip()
     
-    # Format: DD/MM/YYYY HH:MM:SS or DD/MM/YYYY HH:MM or DD/MM/YY HH:MM
     patterns = [
         (r'(\d{2})/(\d{2})/(\d{4})\s+(?:à\s+)?(\d{2})[h:](\d{2})(?::(\d{2}))?', '%d/%m/%Y %H:%M:%S'),
+        (r'(\d{2})/(\d{2})/(\d{2})\s+(?:à\s+)?(\d{2})[h:](\d{2})(?::(\d{2}))?', '%d/%m/%y %H:%M:%S'),
         (r'(\d{2})/(\d{2})/(\d{2})\s+(?:à\s+)?(\d{2})[h:](\d{2})', '%d/%m/%y %H:%M'),
         (r'(\d{2})/(\d{2})/(\d{4})', '%d/%m/%Y'),
         (r'(\d{2})-(\d{2})-(\d{4})', '%d-%m-%Y'),
@@ -119,7 +145,6 @@ def parse_date(date_str: str) -> Optional[str]:
         m = re.search(pat, date_str, re.IGNORECASE)
         if m:
             matched_str = m.group(0).replace('à', '').replace('h', ':').strip()
-            # If no time was matched, add default midday
             if len(matched_str.split()) == 1:
                 matched_str += " 12:00:00"
                 fmt += " %H:%M:%S"
@@ -146,13 +171,25 @@ def extract_text_from_pdf(pdf_path: str) -> str:
         print(f"Error reading PDF {pdf_path}: {e}")
     return "\n".join(text_content)
 
-def parse_superu_ticket(raw_text: str, source_type: str = "manual", source_filename: str = "") -> Dict[str, Any]:
+def parse_superu_ticket(raw_text: str, source_type: str = "manual", source_filename: str = "") -> Optional[Dict[str, Any]]:
     """
-    Parses Super U receipt text (from PDF, EML or plain text).
-    Extracts: store, date, items, totals, discounts, loyalty benefits.
+    Parses a Super U receipt text.
+    Rejects CB slips (reçus de carte bleue).
+    Extracts: store name, city, ticket number, date, items, prices, discounts, Carte U.
     """
+    # 1. Check if this is a Credit Card slip (reçu de carte bleue)
+    # The user specifically requested: "On ne s'intéressera qu'au ticket de caisse."
+    fn_lower = source_filename.lower()
+    if "ticket de cb" in fn_lower or "_cb_" in fn_lower or "recu_cb" in fn_lower:
+        return None
+
+    if "CARTE BANCAIRE" in raw_text.upper() and not any(kw in raw_text for kw in ["Article", "TOTAL [", "TOTAL   ", ">>>>", "BELLON", "Magasin", "CHARLY"]):
+        return None
+
     lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
-    
+    if not lines:
+        return None
+
     store_name = "SUPER U"
     store_city = ""
     ticket_number = None
@@ -165,187 +202,189 @@ def parse_superu_ticket(raw_text: str, source_type: str = "manual", source_filen
     payment_method = "CARTE BANCAIRE"
     items: List[Dict[str, Any]] = []
 
-    # 1. Detect Store Name
-    store_patterns = [
-        r'(SUPER\s+U\s+[\w\s\-\'\.]+)',
-        r'(HYPER\s+U\s+[\w\s\-\'\.]+)',
-        r'(U\s+EXPRESS\s+[\w\s\-\'\.]+)',
-        r'(COURSES\s+U\s+[\w\s\-\'\.]+)',
-        r'(SYSTEME\s+U\s+[\w\s\-\'\.]+)',
-    ]
-    for line in lines[:25]:
-        for pat in store_patterns:
-            m = re.search(pat, line, re.IGNORECASE)
-            if m:
-                found_name = m.group(1).strip()
-                # Stop if it matches generic slogan
-                if not any(skip in found_name.upper() for skip in ["SERVICES", "MERCI", "CARTE"]):
-                    store_name = found_name.upper()
-                    # extract city if present
-                    parts = store_name.split()
-                    if len(parts) >= 3:
-                        store_city = " ".join(parts[2:]).title()
-                    break
-        if store_name != "SUPER U":
-            break
-
-    # 2. Detect Date, Ticket Number, Caisse
+    # 2. Store & City Detection
     full_text = "\n".join(lines)
-    
-    # Date search
-    date_matches = re.findall(r'(\d{2}/\d{2}/\d{2,4}(?:\s+(?:à\s+)?\d{2}[h:]\d{2}(?::\d{2})?)?)', full_text)
-    for dm in date_matches:
-        parsed_d = parse_date(dm)
-        if parsed_d:
-            ticket_date = parsed_d
-            break
-            
-    # Fallback date if none found: current date
+
+    if "CHARLY SUR MARNE" in full_text.upper() or "Route De Pavant" in full_text or "Route de Pavant" in full_text:
+        store_city = "Charly-sur-Marne"
+        store_name = "SUPER U CHARLY SUR MARNE"
+    else:
+        store_match = re.search(r'(SUPER\s+U\s+[\w\s\-\'\.]+)', full_text, re.IGNORECASE)
+        if store_match:
+            cand = store_match.group(1).strip().upper()
+            if not any(skip in cand for skip in ["VOUS REMERCIE", "SERVICES", "CARTE"]):
+                store_name = cand
+                parts = store_name.split()
+                if len(parts) >= 3:
+                    store_city = " ".join(parts[2:]).title()
+
+    # 3. Date, Heure, Ticket, Caisse/TPV
+    # Older style: Opérateur Date Heure TPV Ticket: 113 DR 18/10/24 15:53 9 290854
+    # Newer style: Date Heure Magasin Tpv Util Tick: 07/10/26 11:44:13 21929 106 906 2353
+    meta_m = re.search(r'(\d{2}/\d{2}/\d{2,4})\s+(\d{2}:\d{2}(?::\d{2})?)\s+(?:\d+\s+)?(\d+)\s+(?:\d+\s+)?(\d+)', full_text)
+    if meta_m:
+        d_val, h_val, tpv_val, tick_val = meta_m.groups()
+        caisse_number = tpv_val
+        ticket_number = tick_val
+        ticket_date = parse_date(f"{d_val} {h_val}")
+    else:
+        # Fallback date search
+        dm = re.search(r'(\d{2}/\d{2}/\d{2,4}(?:\s+(?:à\s+)?\d{2}[h:]\d{2}(?::\d{2})?)?)', full_text)
+        if dm:
+            ticket_date = parse_date(dm.group(1))
+        
+        tick_m = re.search(r'(?:Ticket|Tick|N°\s*fiscal\s*du\s*ticket)\s*[:\s#]?\s*([0-9A-Z\-]+)', full_text, re.I)
+        if tick_m:
+            ticket_number = tick_m.group(1)
+
     if not ticket_date:
         ticket_date = datetime.now().strftime('%Y-%m-%d 12:00:00')
 
-    # Caisse & Ticket number
-    caisse_m = re.search(r'(?:caisse|cais\.)\s*[:\s#]?\s*([0-9A-Z]+)', full_text, re.IGNORECASE)
-    if caisse_m:
-        caisse_number = caisse_m.group(1)
-        
-    ticket_num_m = re.search(r'(?:ticket|reçu|facture|cmde)\s*[:\s#n°]?\s*([0-9A-Z\-]+)', full_text, re.IGNORECASE)
-    if ticket_num_m:
-        ticket_number = ticket_num_m.group(1)
-        
-    # Payment method
-    if re.search(r'(CARTE\s+BANCAIRE|CB|SANS\s+CONTACT|MASTERCARD|VISA)', full_text, re.IGNORECASE):
-        payment_method = "CARTE BANCAIRE"
-    elif re.search(r'(ESPECES|LIQUIDE)', full_text, re.IGNORECASE):
-        payment_method = "ESPÈCES"
-    elif re.search(r'(CARTE\s+U|AVANTAGE\s+U)', full_text, re.IGNORECASE):
-        payment_method = "CARTE U"
+    # 4. Total Amount
+    # TOTAL [5] Articles  13,57 €  OR  TOTAL  14 Article(s) 85,00 €
+    tot_m = re.search(r'TOTAL\s+(?:\[\d+\]|\d+)?\s*Article\(?s?\)?\s+([0-9]+[,\.][0-9]{2})\s*€?', full_text, re.I)
+    if tot_m:
+        total_amount = parse_price(tot_m.group(1))
 
-    # 3. Detect Totals & Loyalty
-    total_m = re.search(r'(?:TOTAL\s+(?:TTC|EUROS|A\s+PAYER|PAYE)?)\s*[:]?\s*([0-9]+[,\.][0-9]{2})\s*€?', full_text, re.IGNORECASE)
-    if total_m:
-        total_amount = parse_price(total_m.group(1))
+    if not total_amount:
+        # Look for CB SANS CONTACT XX,XX €
+        cb_tot_m = re.search(r'CB\s+SANS\s+CONTACT(?:\s+[A-Z]+)*\s+([0-9]+[,\.][0-9]{2})\s*€?', full_text, re.I)
+        if cb_tot_m:
+            total_amount = parse_price(cb_tot_m.group(1))
 
-    remises_m = re.search(r'(?:DONT\s+REMISES?|TOTAL\s+REMISES?|REMISES?\s+DEDUITE)\s*[:]?\s*([0-9]+[,\.][0-9]{2})\s*€?', full_text, re.IGNORECASE)
+    # Discounts & Loyalty
+    remises_m = re.search(r'(?:DONT\s+REMISES?|TOTAL\s+REMISES?|REMISES?\s+DEDUITE)\s*[:]?\s*([0-9]+[,\.][0-9]{2})\s*€?', full_text, re.I)
     if remises_m:
         discounts_total = parse_price(remises_m.group(1)) or 0.0
 
-    loyalty_earned_m = re.search(r'(?:AVANTAGES?\s+CARTE\s+U\s+CREDITES?|EUROS?\s+CARTE\s+U\s+GAGNES?)\s*[:]?\s*([0-9]+[,\.][0-9]{2})\s*€?', full_text, re.IGNORECASE)
-    if loyalty_earned_m:
-        loyalty_earned = parse_price(loyalty_earned_m.group(1)) or 0.0
-
-    loyalty_bal_m = re.search(r'(?:NOUVEAU\s+SOLDE\s+CARTE\s+U|SOLDE\s+CARTE\s+U)\s*[:]?\s*([0-9]+[,\.][0-9]{2})\s*€?', full_text, re.IGNORECASE)
+    loyalty_bal_m = re.search(r'(?:VOTRE\s+NOUVEAU\s+SOLDE\s+€\s+CARTE\s+U|NOUVEAU\s+SOLDE\s+CARTE\s+U)\s*[:]?\s*([0-9]+[,\.][0-9]{2})\s*€?', full_text, re.I)
     if loyalty_bal_m:
         loyalty_balance = parse_price(loyalty_bal_m.group(1))
 
-    # 4. Parse Items
-    # Look for item patterns in Super U receipts:
-    # Standard line: `NAME_OF_PRODUCT    12,45 1` or `NAME    12,45 €`
-    # Quantity line below or above: `2 X 1,50   3,00` or `0,850 kg x 2,90 €/kg`
-    line_item_regex = re.compile(r'^([A-Z0-9\s\.\-\'\&]{3,45}?)\s+([0-9]+[,\.][0-9]{2})\s*(?:€|\s+[1234])?$', re.IGNORECASE)
-    qty_price_regex = re.compile(r'([0-9]+(?:\.[0-9]+)?)\s*[Xx*]\s*([0-9]+[,\.][0-9]{2})')
-    weight_regex = re.compile(r'([0-9]+[,\.][0-9]+)\s*kg\s*[xX*]\s*([0-9]+[,\.][0-9]{2})\s*€?/kg', re.IGNORECASE)
-    discount_line_regex = re.compile(r'(?:REMISE|PROMO|AVANTAGE)\s+([A-Z0-9\s]+)?\s*(-?[0-9]+[,\.][0-9]{2})', re.IGNORECASE)
+    loyalty_prec_m = re.search(r'(?:VOTRE\s+SOLDE\s+€\s+CARTE\s+U\s+PRECEDENT)\s*[:]?\s*([0-9]+[,\.][0-9]{2})\s*€?', full_text, re.I)
+    if loyalty_prec_m and loyalty_balance:
+        prec = parse_price(loyalty_prec_m.group(1))
+        if prec is not None and loyalty_balance > prec:
+            loyalty_earned = round(loyalty_balance - prec, 2)
 
+    # 5. Parse Item Rows
+    # Item row pattern: Description followed by price and optional tax code (11, 12, 13)
+    # e.g.: FILET DE POULET CAISSETTE                   9,40 €  11
+    #       SA RECOMPENSE BF PEDIGREE 140G               1,89 €   13
+    item_re = re.compile(r'^(.+?)\s+([0-9]+[,\.][0-9]{2})\s*€(?:\s+(\d{1,2}))?$', re.I)
+    qty_re = re.compile(r'(\d+)\s*[xX]\s*([0-9]+[,\.][0-9]{2})\s*(?:EUR|€)?', re.I)
+    weight_re = re.compile(r'([0-9]+[,\.][0-9]+)\s*kg\s*[xX]\s*([0-9]+[,\.][0-9]{2})\s*(?:€|EUR)/kg', re.I)
+    discount_re = re.compile(r'(?:REMISE|PROMO|AVANTAGE)\s+([A-Z0-9\s]+)?\s*(-?[0-9]+[,\.][0-9]{2})', re.I)
+
+    current_cat = "Épicerie Divers"
     current_idx = 0
-    in_items_section = False
-    
-    stop_words = ["TOTAL", "SOUS-TOTAL", "REGL.", "REGLEMENT", "CARTE BANCAIRE", "RENDU", "DONT TVA", "ARTICLES", "MERCI DE VOTRE VISITE"]
 
-    for i, line in enumerate(lines):
+    stop_words = ["TOTAL [", "TOTAL   ", "SOUS-TOTAL", "NOMBRE DE LIGNES", "VOS AVANTAGES", "TICKET A CONSERVER"]
+
+    for line in lines:
         line_clean = line.strip()
-        
-        # Check if we hit end of items
-        if any(line_clean.upper().startswith(sw) for sw in stop_words):
-            in_items_section = False
+
+        # Stop when hitting the summary/totals section
+        if any(sw in line_clean.upper() for sw in stop_words):
+            break
+
+        # Check for section header
+        if line_clean.startswith(">>>>"):
+            current_cat = line_clean.replace(">>>>", "").strip().title()
+            continue
+        elif line_clean.isupper() and len(line_clean) < 30 and not any(c in line_clean for c in [':', '€', '/', '1', '2', '3', '4', '5', '6', '7', '8', '9']) and not any(sw in line_clean for sw in ['VENTE', 'BELLON', 'DISTRIBUTION', 'ROUTE', 'FRANCE', 'TELEPHONE', 'ARTICLE']):
+            current_cat = line_clean.strip().title()
             continue
 
-        # Look for discount line
-        disc_m = discount_line_regex.search(line_clean)
-        if disc_m:
+        # Check discount modifier line
+        disc_m = discount_re.search(line_clean)
+        if disc_m and items:
             disc_val = abs(parse_price(disc_m.group(2)) or 0.0)
-            if items:
-                items[-1]["discount"] += disc_val
-            discounts_total = max(discounts_total, disc_val)
+            items[-1]["discount"] += disc_val
+            discounts_total = max(discounts_total, items[-1]["discount"])
             continue
 
-        # Look for weight line modifier for previous item
-        w_m = weight_regex.search(line_clean)
-        if w_m and items:
-            kg_val = parse_price(w_m.group(1))
-            price_kg = parse_price(w_m.group(2))
-            if kg_val and price_kg:
-                items[-1]["quantity"] = kg_val
-                items[-1]["unit_price"] = price_kg
-                items[-1]["unit_measure"] = "kg"
-            continue
-
-        # Look for quantity multiplier line
-        qty_m = qty_price_regex.search(line_clean)
-        if qty_m and items:
-            q = float(qty_m.group(1))
-            up = parse_price(qty_m.group(2))
+        # Check quantity multiplier line: e.g. "2 x 1,84 EUR"
+        qm = qty_re.search(line_clean)
+        if qm and items:
+            items[-1]["quantity"] = float(qm.group(1))
+            up = parse_price(qm.group(2))
             if up:
-                items[-1]["quantity"] = q
                 items[-1]["unit_price"] = up
             continue
 
-        # Standard item row
-        m = line_item_regex.match(line_clean)
+        # Check weight multiplier line: e.g. "0,850 kg x 2,90 €/kg"
+        wm = weight_re.search(line_clean)
+        if wm and items:
+            items[-1]["quantity"] = parse_price(wm.group(1)) or 1.0
+            up = parse_price(wm.group(2))
+            if up:
+                items[-1]["unit_price"] = up
+                items[-1]["unit_measure"] = "kg"
+            continue
+
+        # Match product line
+        m = item_re.match(line_clean)
         if m:
-            item_raw_name = m.group(1).strip()
-            total_p = parse_price(m.group(2))
-            
-            # Filter out headers, totals or meta lines
-            if any(skip in item_raw_name.upper() for skip in ["TOTAL", "SOUS TOTAL", "TVA", "CARTE", "POINTS", "REMISE", "RENDU", "EUROS", "ESPECES"]):
+            raw_name = m.group(1).strip()
+            price_val = parse_price(m.group(2))
+
+            # Exclude header/totals/tax lines
+            if any(skip in raw_name.upper() for skip in [
+                "TOTAL", "SOUS-TOTAL", "VENTE", "ARTICLE", "SIRET", "TVA", "MAGASIN",
+                "ROUTE DE PAVANT", "TELEPHONE", "CB SANS CONTACT", "CARTE BANCAIRE",
+                "OPERATEUR", "OPÉRATEUR", "HASH", "POUR VOTRE ACHAT"
+            ]):
                 continue
-                
-            if total_p is not None and total_p > 0 and len(item_raw_name) >= 3:
+
+            if price_val is not None and price_val > 0 and len(raw_name) >= 3:
                 current_idx += 1
-                clean_name = clean_product_name(item_raw_name)
-                category = categorize_item(clean_name)
-                
+                clean_name = clean_product_name(raw_name)
+                cat = categorize_item(clean_name, current_cat)
+
                 items.append({
                     "line_number": current_idx,
-                    "raw_name": item_raw_name,
+                    "raw_name": raw_name,
                     "clean_name": clean_name,
-                    "category": category,
+                    "category": cat,
                     "quantity": 1.0,
-                    "unit_price": total_p,
-                    "total_price": total_p,
+                    "unit_price": price_val,
+                    "total_price": price_val,
                     "discount": 0.0,
                     "unit_measure": "pièce",
                     "date": ticket_date
                 })
 
-    # If total_amount was not found in header/footer, sum the items
     if total_amount is None:
         if items:
             total_amount = round(sum(it["total_price"] - it["discount"] for it in items), 2)
         else:
             total_amount = 0.0
 
+    # If no items were found, this is not a valid ticket de caisse
+    if not items:
+        return None
+
     return {
         "store_name": store_name,
         "store_city": store_city,
         "ticket_number": ticket_number or f"T-{abs(hash(full_text)) % 1000000:06d}",
-        "caisse_number": caisse_number,
+        "caisse_number": caisse_number or "01",
         "date": ticket_date,
-        "total_amount": total_amount,
+        "total_amount": round(total_amount, 2),
         "discounts_total": round(discounts_total, 2),
         "loyalty_earned": round(loyalty_earned, 2),
         "loyalty_balance": loyalty_balance,
         "items_count": len(items),
         "payment_method": payment_method,
-        "raw_text": full_text[:4000], # store excerpt
+        "raw_text": full_text[:4000],
         "source_type": source_type,
         "source_filename": source_filename,
         "items": items
     }
 
-def parse_html_email(html_content: str, source_filename: str = "") -> Dict[str, Any]:
+def parse_html_email(html_content: str, source_filename: str = "") -> Optional[Dict[str, Any]]:
     """Parse HTML email from Courses U or Super U."""
     soup = BeautifulSoup(html_content, "html.parser")
-    # Extract visible plain text
     text = soup.get_text(separator="\n")
     return parse_superu_ticket(text, source_type="email_html", source_filename=source_filename)

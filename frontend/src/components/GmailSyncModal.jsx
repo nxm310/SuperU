@@ -7,7 +7,7 @@ export default function GmailSyncModal({ isOpen, onClose, onSyncComplete }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('coursesu OR "Super U" OR "ticket de caisse"');
+  const [searchQuery, setSearchQuery] = useState('Votre ticket de caisse pour votre achat');
   
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
@@ -154,6 +154,9 @@ export default function GmailSyncModal({ isOpen, onClose, onSyncComplete }) {
               <li>Donnez un nom (ex: "Super U") et cliquez sur <em>Créer</em>.</li>
               <li>Copiez le code de 16 lettres généré et collez-le ci-dessous.</li>
             </ol>
+            <div className="pt-2 border-t border-sky-200 text-sky-950 text-[11px] leading-relaxed">
+              🎯 <strong>Filtrage intelligent :</strong> Seuls les e-mails avec l'objet <em>"Votre ticket de caisse pour votre achat"</em> sont ciblés. Les reçus de carte bleue sont automatiquement écartés afin de n'importer que les articles détaillés de vos tickets de caisse.
+            </div>
           </div>
 
           {/* Form */}
