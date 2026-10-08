@@ -1,16 +1,17 @@
-FROM node:20-alpine AS frontend-builder
-WORKDIR /app/frontend
-COPY frontend/package*.json ./
-RUN npm install
-COPY frontend/ ./
-RUN npm run build
+FROM python:3.11-slim
 
-FROM python:3.9-slim
 WORKDIR /app
+
+# Install dependencies
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy backend code and pre-built frontend distribution
 COPY backend/ ./backend/
-COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+COPY frontend/dist/ ./frontend/dist/
+
+# Create persistent storage directories
+RUN mkdir -p /app/data /app/uploads
 
 ENV PORT=8000
 EXPOSE 8000

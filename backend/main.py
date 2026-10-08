@@ -717,15 +717,53 @@ def export_csv(type: str = "items"):
     )
 
 # Static Frontend mounting (if built)
-dist_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "dist")
-if os.path.exists(dist_dir):
+CANDIDATE_DIST_DIRS = [
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "dist"),
+    os.path.join(os.getcwd(), "frontend", "dist"),
+    "/app/frontend/dist",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "dist"),
+]
+
+dist_dir = None
+for candidate in CANDIDATE_DIST_DIRS:
+    if os.path.exists(candidate) and os.path.isdir(candidate):
+        dist_dir = os.path.abspath(candidate)
+        break
+
+if dist_dir and os.path.exists(os.path.join(dist_dir, "assets")):
     app.mount("/assets", StaticFiles(directory=os.path.join(dist_dir, "assets")), name="assets")
 
-    @app.get("/{full_path:path}")
-    def serve_frontend(full_path: str):
-        if full_path.startswith("api"):
-            raise HTTPException(status_code=404, detail="API endpoint not found")
+@app.get("/")
+def serve_index():
+    if dist_dir:
+        index_file = os.path.join(dist_dir, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+    return HTMLResponse(
+        """<!DOCTYPE html>
+        <html lang="fr">
+        <head><meta charset="utf-8"><title>Super U Ticket Manager</title></head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center; padding: 60px 20px; background: #f8fafc; color: #1e293b;">
+            <div style="max-width: 500px; margin: 0 auto; background: white; padding: 32px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+                <h2 style="color: #0284c7; margin-bottom: 8px;">Super U Receipt Manager</h2>
+                <p style="color: #64748b; font-size: 15px;">Le serveur API fonctionne parfaitement !</p>
+                <p style="font-size: 14px; margin: 20px 0;">Le frontend statique n'a pas été détecté dans <code>frontend/dist</code>.</p>
+                <a href="/docs" style="display: inline-block; background: #0284c7; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 500;">Consulter l'API Swagger (/docs)</a>
+            </div>
+        </body>
+        </html>"""
+    )
+
+@app.get("/{full_path:path}")
+def serve_frontend_spa(full_path: str):
+    if full_path.startswith("api/") or full_path == "api":
+        raise HTTPException(status_code=404, detail="API endpoint not found")
+    if dist_dir:
         file_path = os.path.join(dist_dir, full_path)
         if os.path.exists(file_path) and os.path.isfile(file_path):
             return FileResponse(file_path)
-        return FileResponse(os.path.join(dist_dir, "index.html"))
+        index_file = os.path.join(dist_dir, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+    raise HTTPException(status_code=404, detail="Page non trouvée")
+
