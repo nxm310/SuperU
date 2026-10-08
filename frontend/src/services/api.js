@@ -1,13 +1,28 @@
 const API_BASE = '/api';
 
-export async function fetchDashboardStats(period = 'all', startDate = null, endDate = null) {
-  let url = `${API_BASE}/dashboard/stats?period=${period}`;
-  if (startDate && endDate) {
-    url += `&start_date=${startDate}&end_date=${endDate}`;
-  }
-  const res = await fetch(url);
+export async function fetchDashboardStats({ period = 'all', year = '', startDate = null, endDate = null, article = '' } = {}) {
+  const params = new URLSearchParams();
+  if (period) params.append('period', period);
+  if (year && year !== 'all') params.append('year', year);
+  if (startDate) params.append('start_date', startDate);
+  if (endDate) params.append('end_date', endDate);
+  if (article) params.append('article', article);
+
+  const res = await fetch(`${API_BASE}/dashboard/stats?${params.toString()}`);
   if (!res.ok) throw new Error('Erreur lors du chargement des statistiques');
   return res.json();
+}
+
+export async function autocompleteArticles(query) {
+  if (!query || query.trim().length < 1) return [];
+  try {
+    const res = await fetch(`${API_BASE}/articles/autocomplete?q=${encodeURIComponent(query.trim())}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.results || [];
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchTickets({ search = '', store = '', startDate = '', endDate = '', limit = 50, offset = 0 } = {}) {

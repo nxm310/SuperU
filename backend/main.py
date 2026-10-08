@@ -43,14 +43,22 @@ class IMAPCredentials(BaseModel):
 
 # --- DASHBOARD STATS ---
 @app.get("/api/dashboard/stats")
-def get_dashboard_stats(period: str = "all", start_date: Optional[str] = None, end_date: Optional[str] = None):
+def get_dashboard_stats(
+    period: str = "all",
+    year: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    article: Optional[str] = None
+):
     conn = get_db()
     cursor = conn.cursor()
 
     # Determine date range
     now = datetime.now()
-    if period == "month":
-        # Current month
+    if year and year != "all" and year.strip() != "":
+        start = f"{year.strip()}-01-01 00:00:00"
+        end = f"{year.strip()}-12-31 23:59:59"
+    elif period == "month":
         start = now.replace(day=1, hour=0, minute=0, second=0).strftime("%Y-%m-%d %H:%M:%S")
         end = now.strftime("%Y-%m-%d %H:%M:%S")
     elif period == "3months":
@@ -65,6 +73,10 @@ def get_dashboard_stats(period: str = "all", start_date: Optional[str] = None, e
     else:
         start = "1970-01-01 00:00:00"
         end = "2099-12-31 23:59:59"
+
+    # Distinct years for the dropdown menu
+    cursor.execute("SELECT DISTINCT strftime('%Y', date) as yr FROM tickets WHERE yr IS NOT NULL AND yr != '' ORDER BY yr DESC")
+    available_years = [r["yr"] for r in cursor.fetchall() if r["yr"]]
 
     # Summary metrics
     cursor.execute("""
@@ -176,10 +188,56 @@ def get_dashboard_stats(period: str = "all", start_date: Optional[str] = None, e
         for r in top_prod_rows
     ]
 
+    # Article search in dashboard
+    article_results = []
+    if article and article.strip():
+        cursor.execute("""
+            SELECT 
+                clean_name,
+                category,
+                COUNT(*) as purchase_count,
+                SUM(quantity) as total_quantity,
+                SUM(total_price) as total_spent,
+                MIN(unit_price) as min_price,
+                MAX(unit_price) as max_price,
+                AVG(unit_price) as avg_price,
+                unit_measure
+            FROM ticket_items
+            WHERE clean_name LIKE ? AND date >= ? AND date <= ?
+            GROUP BY clean_name
+            ORDER BY purchase_count DESC
+            LIMIT 12
+        """, (f"%{article.strip()}%", start, end))
+        for r in cursor.fetchall():
+            cursor.execute("SELECT unit_price FROM ticket_items WHERE clean_name = ? ORDER BY date DESC LIMIT 1", (r["clean_name"],))
+            lp = cursor.fetchone()
+            cursor.execute("SELECT unit_price FROM ticket_items WHERE clean_name = ? ORDER BY date ASC LIMIT 1", (r["clean_name"],))
+            fp = cursor.fetchone()
+            first_p = fp[0] if fp else r["avg_price"]
+            last_p = lp[0] if lp else r["avg_price"]
+            pct = round(((last_p - first_p) / first_p * 100), 1) if first_p > 0 else 0.0
+
+            article_results.append({
+                "name": r["clean_name"],
+                "category": r["category"],
+                "purchase_count": r["purchase_count"],
+                "total_quantity": round(r["total_quantity"], 1),
+                "total_spent": round(r["total_spent"], 2),
+                "min_price": round(r["min_price"], 2),
+                "max_price": round(r["max_price"], 2),
+                "avg_price": round(r["avg_price"], 2),
+                "current_price": round(last_p, 2),
+                "first_price": round(first_p, 2),
+                "price_change_pct": pct,
+                "unit_measure": r["unit_measure"]
+            })
+
     conn.close()
 
     return {
         "period": period,
+        "selected_year": year or "all",
+        "available_years": available_years,
         "total_spent": total_spent,
         "total_tickets": total_tickets,
         "avg_ticket": avg_ticket,
@@ -189,8 +247,35 @@ def get_dashboard_stats(period: str = "all", start_date: Optional[str] = None, e
         "monthly_trend": monthly_trend,
         "categories_breakdown": categories_breakdown,
         "stores_summary": stores_summary,
-        "top_products": top_products
+        "top_products": top_products,
+        "article_search": article or "",
+        "article_results": article_results
     }
+
+@app.get("/api/articles/autocomplete")
+def autocomplete_articles(q: str = Query(..., min_length=1)):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT clean_name, category, COUNT(*) as count, MAX(unit_price) as last_price
+        FROM ticket_items
+        WHERE clean_name LIKE ?
+        GROUP BY clean_name
+        ORDER BY count DESC
+        LIMIT 8
+    """, (f"%{q.strip()}%",))
+    rows = [
+        {
+            "name": r["clean_name"],
+            "category": r["category"],
+            "count": r["count"],
+            "last_price": round(r["last_price"], 2)
+        }
+        for r in cursor.fetchall()
+    ]
+    conn.close()
+    return {"results": rows}
+
 
 # --- TICKETS ENDPOINTS ---
 @app.get("/api/tickets")

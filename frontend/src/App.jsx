@@ -33,6 +33,8 @@ import {
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [period, setPeriod] = useState('all');
+  const [selectedYear, setSelectedYear] = useState('all');
+  const [articleSearch, setArticleSearch] = useState('');
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -45,7 +47,11 @@ export default function App() {
 
   const loadStats = async () => {
     try {
-      const data = await fetchDashboardStats(period);
+      const data = await fetchDashboardStats({
+        period,
+        year: selectedYear,
+        article: articleSearch
+      });
       setStats(data);
     } catch (err) {
       console.error(err);
@@ -56,7 +62,7 @@ export default function App() {
 
   useEffect(() => {
     loadStats();
-  }, [period]);
+  }, [period, selectedYear, articleSearch]);
 
   const handleSelectTicket = async (ticketId) => {
     try {
@@ -257,6 +263,10 @@ export default function App() {
             stats={stats}
             period={period}
             setPeriod={setPeriod}
+            selectedYear={selectedYear}
+            setSelectedYear={setSelectedYear}
+            articleSearch={articleSearch}
+            setArticleSearch={setArticleSearch}
             onOpenSync={() => setIsGmailModalOpen(true)}
             onOpenUpload={() => setIsUploadModalOpen(true)}
             onLoadDemo={handleLoadDemo}
