@@ -12,3 +12,10 @@ services:
       - ./uploads:/app/uploads
     environment:
       - PORT=8000
+    labels:
+      - "gethomepage.name=Super U"
+      - "gethomepage.description=Tickets de caisse & suivi des prix"
+      - "gethomepage.group=Finances"
+      - "gethomepage.icon=shopping-cart"
+      - "gethomepage.href=http://superu.orb.local"
+      - "gethomepage.ping=http://superu:8000"
