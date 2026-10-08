@@ -20,12 +20,19 @@ from .gmail_sync import (
 
 app = FastAPI(title="Super U Ticket Manager", version="1.0.0")
 
-# Enable CORS for Vite dev server
+# Restrict CORS to local loopback only
+ALLOWED_ORIGINS = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -629,9 +636,14 @@ def get_sync_status():
     logs = [dict(r) for r in cursor.fetchall()]
     conn.close()
 
+    cfg_dict = dict(cfg) if cfg else None
+    if cfg_dict and cfg_dict.get("imap_password"):
+        cfg_dict["has_password"] = True
+        cfg_dict["imap_password"] = "••••••••••••••••"
+
     return {
         "state": SYNC_STATE,
-        "config": dict(cfg) if cfg else None,
+        "config": cfg_dict,
         "recent_logs": logs
     }
 
