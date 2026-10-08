@@ -16,6 +16,6 @@ services:
       - "gethomepage.name=Super U"
       - "gethomepage.description=Tickets de caisse & suivi des prix"
       - "gethomepage.group=Finances"
-      - "gethomepage.icon=shopping-cart"
-      - "gethomepage.href=http://superu.orb.local"
+      - "gethomepage.icon=http://192.168.50.174:8080/superu-logo.svg"
+      - "gethomepage.href=http://192.168.50.174:8080"
       - "gethomepage.ping=http://superu:8000"
