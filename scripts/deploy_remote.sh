@@ -3,7 +3,7 @@ set -e
 
 # Deployment script from Mac mini M5 to Mac M1 (OrbStack Server)
 REMOTE_HOST="mac-m1"
-REMOTE_DIR="/Users/goldohrack/SuperU"
+REMOTE_DIR="/Users/goldohrack/docker/superu"
 LOCAL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 echo "🚀 [1/3] Construction du frontend si nécessaire..."
