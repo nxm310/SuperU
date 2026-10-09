@@ -40,6 +40,7 @@ class IMAPCredentials(BaseModel):
     server: Optional[str] = "imap.gmail.com"
     port: Optional[int] = 993
     search_query: Optional[str] = 'coursesu OR "Super U" OR "ticket de caisse"'
+    full_rescan: Optional[bool] = False
 
 # --- DASHBOARD STATS ---
 @app.get("/api/dashboard/stats")
@@ -627,6 +628,10 @@ def get_sync_status():
     
     cursor.execute("SELECT * FROM sync_logs ORDER BY id DESC LIMIT 5")
     logs = [dict(r) for r in cursor.fetchall()]
+
+    cursor.execute("SELECT MAX(date) FROM tickets WHERE date IS NOT NULL AND date != ''")
+    max_row = cursor.fetchone()
+    latest_ticket_date = max_row[0] if max_row and max_row[0] else None
     conn.close()
 
     cfg_dict = dict(cfg) if cfg else None
@@ -637,7 +642,8 @@ def get_sync_status():
     return {
         "state": SYNC_STATE,
         "config": cfg_dict,
-        "recent_logs": logs
+        "recent_logs": logs,
+        "latest_ticket_date": latest_ticket_date
     }
 
 @app.post("/api/sync/test")
@@ -663,7 +669,14 @@ def start_sync(creds: IMAPCredentials):
     conn.commit()
     conn.close()
 
-    started = start_background_sync(creds.user, creds.password, creds.server, creds.port, creds.search_query)
+    started = start_background_sync(
+        creds.user, 
+        creds.password, 
+        creds.server, 
+        creds.port, 
+        creds.search_query,
+        full_rescan=bool(creds.full_rescan)
+    )
     if not started:
         raise HTTPException(status_code=400, detail="Une synchronisation est déjà en cours.")
     return {"status": "started", "message": "Synchronisation lancée en arrière-plan"}

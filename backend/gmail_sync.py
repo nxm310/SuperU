@@ -4,7 +4,7 @@ from email.header import decode_header
 import os
 import re
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from .db import get_db
 from .parser import parse_superu_ticket, parse_html_email, extract_text_from_pdf
@@ -47,11 +47,12 @@ def test_imap_connection(user: str, password: str, server: str = "imap.gmail.com
     except Exception as e:
         return {"success": False, "message": f"Erreur de connexion : {str(e)}"}
 
-def run_imap_sync(user: str, password: str, server: str = "imap.gmail.com", port: int = 993, search_query: str = ""):
+def run_imap_sync(user: str, password: str, server: str = "imap.gmail.com", port: int = 993, search_query: str = "", full_rescan: bool = False):
     """
     Executes sync against Gmail IMAP.
-    Specifically searches for emails with subject: 'Votre ticket de caisse pour votre achat'
-    and extracts ONLY the 'Ticket de caisse' attachment, completely ignoring CB receipts.
+    Specifically searches for emails with subject: 'Votre ticket de caisse pour votre achat'.
+    By default, only searches emails SINCE the latest ticket date recorded in database,
+    avoiding re-scanning the entire email history.
     """
     global SYNC_STATE
     clean_pass = password.replace(" ", "").strip()
@@ -76,6 +77,26 @@ def run_imap_sync(user: str, password: str, server: str = "imap.gmail.com", port
     log_id = cursor.lastrowid
     conn.commit()
 
+    # Determine latest ticket date in DB for incremental scan
+    since_dt = None
+    imap_date = None
+    if not full_rescan:
+        try:
+            cursor.execute("SELECT MAX(date) FROM tickets WHERE date IS NOT NULL AND date != ''")
+            row = cursor.fetchone()
+            if row and row[0]:
+                latest_raw = str(row[0]).strip()
+                date_part = latest_raw.split()[0]
+                dt = datetime.strptime(date_part, "%Y-%m-%d")
+                # Subtract 1 day for timezone and same-day purchase safety
+                since_dt = dt - timedelta(days=1)
+                ENGLISH_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+                imap_date = f"{since_dt.day:02d}-{ENGLISH_MONTHS[since_dt.month - 1]}-{since_dt.year}"
+        except Exception as e:
+            print(f"Erreur détermination date incrémentale : {e}")
+            since_dt = None
+            imap_date = None
+
     try:
         mail = imaplib.IMAP4_SSL(server, port)
         mail.login(user, clean_pass)
@@ -83,11 +104,17 @@ def run_imap_sync(user: str, password: str, server: str = "imap.gmail.com", port
         status, _ = mail.select("INBOX", readonly=True)
         
         SYNC_STATE["progress_percent"] = 10
-        SYNC_STATE["current_step"] = "Recherche des e-mails 'Votre ticket de caisse pour votre achat'..."
 
-        # IMAP search: Search for subject containing "ticket de caisse"
-        # We will then strictly filter in Python for "votre ticket de caisse pour votre achat"
-        ret, data = mail.search(None, 'SUBJECT', '"ticket de caisse"')
+        # Perform IMAP search
+        if imap_date:
+            SYNC_STATE["current_step"] = f"Recherche incrémentale des nouveaux tickets depuis le {since_dt.strftime('%d/%m/%Y')}..."
+            try:
+                ret, data = mail.search(None, 'SINCE', imap_date, 'SUBJECT', '"ticket de caisse"')
+            except Exception:
+                ret, data = mail.search(None, 'SUBJECT', '"ticket de caisse"')
+        else:
+            SYNC_STATE["current_step"] = "Recherche de tous les e-mails 'ticket de caisse'..."
+            ret, data = mail.search(None, 'SUBJECT', '"ticket de caisse"')
         
         candidate_uids = []
         if ret == "OK" and data and data[0]:
@@ -96,13 +123,16 @@ def run_imap_sync(user: str, password: str, server: str = "imap.gmail.com", port
         total_candidates = len(candidate_uids)
         if total_candidates == 0:
             SYNC_STATE["progress_percent"] = 100
-            SYNC_STATE["current_step"] = "Aucun email de ticket de caisse trouvé."
+            if imap_date:
+                SYNC_STATE["current_step"] = f"Base à jour : aucun nouveau ticket depuis le {since_dt.strftime('%d/%m/%Y')}."
+            else:
+                SYNC_STATE["current_step"] = "Aucun email de ticket de caisse trouvé."
             SYNC_STATE["is_running"] = False
             mail.logout()
             return
 
         SYNC_STATE["progress_percent"] = 15
-        SYNC_STATE["current_step"] = f"Filtrage des emails ({total_candidates} trouvés)..."
+        SYNC_STATE["current_step"] = f"Filtrage des emails récents ({total_candidates} trouvés)..."
 
         # The user's exact subject requirement
         required_phrase = "votre ticket de caisse pour votre achat"
@@ -296,11 +326,11 @@ def run_imap_sync(user: str, password: str, server: str = "imap.gmail.com", port
     finally:
         conn.close()
 
-def start_background_sync(user: str, password: str, server: str = "imap.gmail.com", port: int = 993, search_query: str = ""):
+def start_background_sync(user: str, password: str, server: str = "imap.gmail.com", port: int = 993, search_query: str = "", full_rescan: bool = False):
     """Launches sync thread if not already running."""
     global SYNC_STATE
     if SYNC_STATE["is_running"]:
         return False
-    t = threading.Thread(target=run_imap_sync, args=(user, password, server, port, search_query), daemon=True)
+    t = threading.Thread(target=run_imap_sync, args=(user, password, server, port, search_query, full_rescan), daemon=True)
     t.start()
     return True

@@ -15,6 +15,8 @@ export default function GmailSyncModal({ isOpen, onClose, onSyncComplete }) {
   const [syncState, setSyncState] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
+  const [latestTicketDate, setLatestTicketDate] = useState(null);
+  const [fullRescan, setFullRescan] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -26,6 +28,9 @@ export default function GmailSyncModal({ isOpen, onClose, onSyncComplete }) {
     // Load current config and status
     getSyncStatus().then(data => {
       setSyncState(data.state);
+      if (data.latest_ticket_date) {
+        setLatestTicketDate(data.latest_ticket_date);
+      }
       if (data.config) {
         setEmail(data.config.imap_user || '');
         setPassword(data.config.imap_password || '');
@@ -89,7 +94,12 @@ export default function GmailSyncModal({ isOpen, onClose, onSyncComplete }) {
     setError(null);
     setSyncing(true);
     try {
-      await startSync({ user: email, password, search_query: searchQuery });
+      await startSync({ 
+        user: email, 
+        password, 
+        search_query: searchQuery,
+        full_rescan: fullRescan 
+      });
     } catch (err) {
       setError(err.message);
       setSyncing(false);
@@ -201,6 +211,33 @@ export default function GmailSyncModal({ isOpen, onClose, onSyncComplete }) {
                 </button>
               </div>
             </div>
+
+            {/* Incremental Scan Info */}
+            {latestTicketDate && (
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
+                <div className="flex items-center justify-between text-xs text-slate-700">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                    <span>Dernier ticket en base : <strong>{latestTicketDate}</strong></span>
+                  </div>
+                  <span className="text-[11px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full font-semibold">
+                    ⚡ Scan rapide
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  La recherche se limitera automatiquement aux e-mails reçus depuis cette date.
+                </p>
+                <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer pt-1.5 border-t border-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={fullRescan}
+                    onChange={(e) => setFullRescan(e.target.checked)}
+                    className="rounded border-slate-300 text-sky-600 focus:ring-sky-500 w-3.5 h-3.5"
+                  />
+                  <span>Forcer une réanalyse complète de tous les anciens e-mails (plus long)</span>
+                </label>
+              </div>
+            )}
 
             {/* Test result display */}
             {testResult && (
